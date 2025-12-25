@@ -1,0 +1,2 @@
+"""MediScan AI tests."""
+
