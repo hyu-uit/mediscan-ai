@@ -48,13 +48,27 @@ def test_scan_with_file_no_groq_client():
 
 
 def test_scan_success():
-    """Test scan endpoint with successful medicine extraction."""
+    """Test scan endpoint with successful medication extraction."""
     dummy_image = io.BytesIO(b"fake image content")
 
+    mock_ai_response = """{
+        "medications": [
+            {
+                "name": "Amoxicillin",
+                "dosage": "500",
+                "unit": "mg",
+                "frequencyType": "daily",
+                "intakeTimes": [
+                    {"time": "08:00 AM", "type": "morning"},
+                    {"time": "08:00 PM", "type": "night"}
+                ]
+            }
+        ],
+        "confidence": 0.9
+    }"""
+
     mock_response = AsyncMock()
-    mock_response.choices = [
-        AsyncMock(message=AsyncMock(content='["Amoxicillin", "Ibuprofen"]'))
-    ]
+    mock_response.choices = [AsyncMock(message=AsyncMock(content=mock_ai_response))]
 
     with patch("mediscan_ai.services._groq_client") as mock_client:
         mock_client.chat.completions.create.return_value = mock_response
@@ -65,15 +79,21 @@ def test_scan_success():
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert data["medicines"] == ["Amoxicillin", "Ibuprofen"]
+        assert len(data["medications"]) == 1
+        assert data["medications"][0]["name"] == "Amoxicillin"
+        assert data["medications"][0]["dosage"] == "500"
+        assert data["medications"][0]["unit"] == "mg"
+        assert data["confidence"] == 0.9
 
 
-def test_scan_no_medicines_found():
-    """Test scan endpoint when no medicines are found."""
+def test_scan_no_medications_found():
+    """Test scan endpoint when no medications are found."""
     dummy_image = io.BytesIO(b"fake image content")
 
     mock_response = AsyncMock()
-    mock_response.choices = [AsyncMock(message=AsyncMock(content="[]"))]
+    mock_response.choices = [
+        AsyncMock(message=AsyncMock(content='{"medications": [], "confidence": 0}'))
+    ]
 
     with patch("mediscan_ai.services._groq_client") as mock_client:
         mock_client.chat.completions.create.return_value = mock_response

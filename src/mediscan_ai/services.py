@@ -6,10 +6,11 @@ import base64
 import json
 import os
 import re
-from typing import List, Optional
+import uuid
+from typing import Any, Dict, List, Optional
 
-from dotenv import load_dotenv  # pyright: ignore[reportMissingImports]
-from groq import Groq  # pyright: ignore[reportMissingImports]
+from dotenv import load_dotenv
+from groq import Groq
 
 load_dotenv()
 
@@ -37,34 +38,93 @@ def _get_image_media_type(content_type: Optional[str]) -> str:
     return "image/jpeg"
 
 
-def _parse_medicines_from_response(result_text: str) -> List[str]:
-    """Parse medicine names from AI response."""
+def _generate_id() -> str:
+    """Generate a UUID string."""
+    return str(uuid.uuid4())
+
+
+def _parse_medications_from_response(result_text: str) -> Dict[str, Any]:
+    """Parse medication details from AI response."""
     try:
-        if result_text.startswith("["):
-            medicines = json.loads(result_text)
+        # Try to find JSON object in response
+        if result_text.startswith("{"):
+            return json.loads(result_text)
         else:
-            match = re.search(r"\[.*?\]", result_text, re.DOTALL)
+            # Try to extract JSON from markdown code blocks or text
+            match = re.search(r"\{[\s\S]*\}", result_text)
             if match:
-                medicines = json.loads(match.group())
-            else:
-                medicines = []
+                return json.loads(match.group())
     except json.JSONDecodeError:
-        medicines = []
+        pass
+    return {"medications": []}
 
-    return medicines if isinstance(medicines, list) else []
+
+def _ensure_ids(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensure all medications and intake times have IDs."""
+    medications = data.get("medications", [])
+    for med in medications:
+        if not med.get("id"):
+            med["id"] = _generate_id()
+        intake_times = med.get("intakeTimes", [])
+        if intake_times:
+            for intake in intake_times:
+                if not intake.get("id"):
+                    intake["id"] = _generate_id()
+    return data
 
 
-async def extract_medicines_from_image(
+EXTRACTION_PROMPT = """Analyze this prescription image and extract all medication details.
+
+Return a JSON object with this EXACT structure:
+{
+  "medications": [
+    {
+      "name": "Medicine Name",
+      "dosage": "500",
+      "unit": "mg",
+      "instructions": "Take with food",
+      "notes": "Any additional notes",
+      "frequencyType": "daily",
+      "intervalValue": "1",
+      "intervalUnit": "days",
+      "selectedDays": ["monday", "wednesday", "friday"],
+      "intakeTimes": [
+        {"time": "08:00 AM", "type": "morning"},
+        {"time": "08:00 PM", "type": "night"}
+      ]
+    }
+  ],
+  "rawText": "Raw text from prescription if readable",
+  "confidence": 0.85
+}
+
+IMPORTANT RULES:
+1. Extract ALL medications found in the prescription
+2. Use these EXACT values for fields:
+   - unit: "mg", "ml", "tablet", "capsule", "drop", "patch"
+   - frequencyType: "daily", "interval", "specific_days"
+   - intervalUnit: "days", "weeks", "months"
+   - type (for intakeTimes): "morning", "noon", "afternoon", "night", "before_sleep"
+   - selectedDays: "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"
+3. If information is not available, omit the field (don't use null)
+4. For time, use 12-hour format like "08:00 AM", "02:00 PM"
+5. confidence should be 0-1 based on image clarity and readability
+6. Return ONLY the JSON object, no other text
+
+If you cannot read the prescription, return: {"medications": [], "confidence": 0}"""
+
+
+async def extract_medications_from_image(
     image_bytes: bytes, content_type: Optional[str]
-) -> List[str]:
-    """Extract medicine names from prescription image using Groq Vision.
+) -> Dict[str, Any]:
+    """Extract medication details from prescription image using Groq Vision.
 
     Args:
         image_bytes: Raw image bytes
         content_type: MIME type of the image
 
     Returns:
-        List of medicine names extracted from the prescription
+        Dictionary with medications list and metadata
 
     Raises:
         ValueError: If Groq client is not initialized
@@ -83,10 +143,7 @@ async def extract_medicines_from_image(
                 "content": [
                     {
                         "type": "text",
-                        "text": """Analyze this prescription image and extract all medicine names.
-Return ONLY a JSON array of medicine names, nothing else.
-Example: ["Amoxicillin", "Ibuprofen", "Paracetamol"]
-If you cannot read the prescription or find no medicines, return an empty array: []""",
+                        "text": EXTRACTION_PROMPT,
                     },
                     {
                         "type": "image_url",
@@ -98,9 +155,9 @@ If you cannot read the prescription or find no medicines, return an empty array:
             }
         ],
         temperature=0.1,
-        max_tokens=500,
+        max_tokens=2000,
     )
 
     result_text = response.choices[0].message.content.strip()
-    return _parse_medicines_from_response(result_text)
-
+    data = _parse_medications_from_response(result_text)
+    return _ensure_ids(data)
