@@ -26,12 +26,12 @@ class Medication(BaseModel):
     id: str
     name: str
     dosage: Optional[str] = None  # "500", "250"
-    unit: Optional[str] = None  # "mg", "ml", "tablet", "capsule", "drop", "patch"
+    unit: Optional[str] = None  # "MG", "ML", "TABLET", "CAPSULE", "DROP", "PATCH"
     instructions: Optional[str] = None  # "Take with food"
     notes: Optional[str] = None
-    frequencyType: Optional[str] = None  # "daily", "interval", "specific_days"
+    frequencyType: Optional[str] = None  # "DAILY", "INTERVAL", "SPECIFIC_DAYS"
     intervalValue: Optional[str] = None  # "1", "2", "3"
-    intervalUnit: Optional[str] = None  # "days", "weeks", "months"
+    intervalUnit: Optional[str] = None  # "DAYS", "WEEKS", "MONTHS"
     selectedDays: Optional[List[str]] = None  # ["monday", "wednesday"]
     intakeTimes: Optional[List[IntakeTime]] = None
 

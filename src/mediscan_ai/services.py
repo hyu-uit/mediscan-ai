@@ -81,16 +81,16 @@ Return a JSON object with this EXACT structure:
     {
       "name": "Medicine Name",
       "dosage": "500",
-      "unit": "mg",
+      "unit": "MG",
       "instructions": "Take with food",
       "notes": "Any additional notes",
-      "frequencyType": "daily",
+      "frequencyType": "DAILY",
       "intervalValue": "1",
-      "intervalUnit": "days",
+      "intervalUnit": "DAYS",
       "selectedDays": ["monday", "wednesday", "friday"],
       "intakeTimes": [
-        {"time": "08:00 AM", "type": "morning"},
-        {"time": "08:00 PM", "type": "night"}
+        {"time": "08:00 AM", "type": "MORNING"},
+        {"time": "08:00 PM", "type": "NIGHT"}
       ]
     }
   ],
@@ -100,11 +100,11 @@ Return a JSON object with this EXACT structure:
 
 IMPORTANT RULES:
 1. Extract ALL medications found in the prescription
-2. Use these EXACT values for fields:
-   - unit: "mg", "ml", "tablet", "capsule", "drop", "patch"
-   - frequencyType: "daily", "interval", "specific_days"
-   - intervalUnit: "days", "weeks", "months"
-   - type (for intakeTimes): "morning", "noon", "afternoon", "night", "before_sleep"
+2. Use these EXACT UPPERCASE values for fields:
+   - unit: "MG", "ML", "TABLET", "CAPSULE", "DROP", "PATCH"
+   - frequencyType: "DAILY", "INTERVAL", "SPECIFIC_DAYS"
+   - intervalUnit: "DAYS", "WEEKS", "MONTHS"
+   - type (for intakeTimes): "MORNING", "NOON", "AFTERNOON", "NIGHT", "BEFORE_SLEEP"
    - selectedDays: "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"
 3. If information is not available, omit the field (don't use null)
 4. For time, use 12-hour format like "08:00 AM", "02:00 PM"
